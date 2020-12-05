@@ -16,6 +16,7 @@ from parameters import Parameters
 import math
 import util
 import hard_sampling
+from torch2trt import torch2trt
 
 ############################################################
 ##
@@ -32,7 +33,12 @@ class Agent(nn.Module):
 
         self.p = Parameters()
 
-        self.lane_detection_network = lane_detection_network()
+        model = lane_detection_network()
+        model.eval().cuda()
+        x = torch.ones((1,3,256,512)).cuda()
+#        model_trt = torch2trt(model, [x])
+
+        self.lane_detection_network = model
 
         self.setup_optimizer()
 
@@ -395,4 +401,7 @@ class Agent(nn.Module):
 
     def sample_reset(self):
         self.hard_sampling = hard_sampling.hard_sampling()
+
+    def export_onnx(self, input_image, filename):
+        torch_out = torch.onnx.export(self.lane_detection_network, input_image, filename, verbose=True)
 

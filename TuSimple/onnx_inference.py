@@ -7,6 +7,7 @@ import numpy as np
 import onnxruntime as rt 
 import os
 import cv2
+import time
 from copy import deepcopy
 
 print(rt.__version__)
@@ -64,13 +65,13 @@ def draw_points(x, y, image, w_ratio, h_ratio):
     for id in range(len(x)):
         color_index += 1
         if color_index > 12:
-            color_index = 12  # 最多显示12种不同颜色，代表实例
+            color_index = 12
         x_l = x[id]
         x_list = [int(x / w_ratio) for x in x_l]
         y_l = y[id]
         y_list = [int(y / h_ratio) for y in y_l]
         for pts in zip(x_list, y_list):
-            image = cv2.circle(image, (int(pts[0]), int(pts[1])), 8, p.color[color_index], -1)  # 5
+            image = cv2.circle(image, (int(pts[0]), int(pts[1])), 8, p.color[2], -1)  # 5
     return image
 
 def generate_result(confidance, offsets,instance, thresh):
@@ -172,7 +173,7 @@ def onnx_inference(model_path,test_images,save_test_dir):
     img_list = [img for img in img_list if '.jpg' in img]
     use_ori = True
 
-    for img in img_list[5:8]:
+    for img in img_list:
         print("Now Dealing With:",img)
         ori_image = cv2.imread(test_images + '/' + img) #hw, cv2.IMREAD_UNCHANGED
         test_image = cv2.resize(ori_image, (p.x_size, p.y_size)) / 255.0
@@ -187,19 +188,71 @@ def onnx_inference(model_path,test_images,save_test_dir):
         _, _, ti = test(pred_onnx, ori_image, w_ratio, h_ratio ,thresh=p.threshold_point)
         cv2.imwrite(save_test_dir + '/' + "{}_tested.jpg".format(img.split('.jpg')[0]), ti)
 
+def onnx_inference_movie(model_path,test_movie):
+#    so = rt.SessionOptions
+#    so.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_BASIC
+    sess = rt.InferenceSession(model_path)
+
+    print('session created')
+
+    input_name = sess.get_inputs()[0].name
+    # output->9 10 11
+    outputs = sess.get_outputs()
+    for i in range(0,len(outputs)):
+        print(outputs[i].name)
+    confidences, offsets, instances = sess.get_outputs()[9].name, sess.get_outputs()[10].name, sess.get_outputs()[11].name
+    output_name = [confidences, offsets, instances]
+    return 0
+
+    cap = cv2.VideoCapture(test_movie)
+    fourcc = cv2.VideoWriter_fourcc(*'X264')
+    out = cv2.VideoWriter('output.avi', fourcc, 30.0, (1280,  720))
+    while(cap.isOpened()):
+        prevTime = time.time()
+
+        ret, ori_image = cap.read()
+        if not ret:
+            break
+        test_image = cv2.resize(ori_image, (p.x_size, p.y_size)) / 255.0
+        
+        test_image = to_np(test_image)
+
+        pred_onnx = sess.run(output_name, {input_name:test_image})
+
+        w_ratio = p.x_size * 1.0 / ori_image.shape[1]
+        h_ratio = p.y_size* 1.0 / ori_image.shape[0]
+
+        _, _, ti = test(pred_onnx, ori_image, w_ratio, h_ratio ,thresh=p.threshold_point)
+        curTime = time.time()
+
+        ti = cv2.resize(ti, (1280, 720))
+        sec = curTime - prevTime
+        fps = 1/(sec)
+        s = "FPS : "+ str(fps)
+        cv2.putText(ti, s, (0, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0))
+        out.write(ti)
+        cv2.imshow('frame',ti)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    out.release()
+    cv2.destroyAllWindows()
+
 if __name__ == '__main__':
 
-    model_dir = '/media/data4/yg/PINet_new-master/CurveLanes/onnx_models/'
-    model_path = model_dir + 'pinet_v2.onnx'
+    model_dir = './onnx_models/'
+    model_path = model_dir + 'pinet.onnx'
 
-    test_images = '/media/data4/yg/PINet_new-master/CurveLanes/test_curves'
-    save_test_dir = '/media/data4/yg/PINet_new-master/CurveLanes/test_onnx_result'
+    test_images = './test_curves'
+    save_test_dir = './test_result'
     if not os.path.exists(save_test_dir):
         os.makedirs(save_test_dir)
 
     print("======= MODEL INFERENCE =======")
 
-    onnx_inference(model_path, test_images, save_test_dir)
+    #onnx_inference(model_path, test_images, save_test_dir)
+    onnx_inference_movie(model_path, "/home/tim/Codes-for-Lane-Detection/ERFNet-CULane-PyTorch/data/day2.MOV")
     print("finished~~")
 
 

@@ -7,6 +7,7 @@
 import cv2
 import json
 import torch
+import torch.backends.cudnn as cudnn
 import agent
 import numpy as np
 from copy import deepcopy
@@ -15,7 +16,7 @@ import time
 from parameters import Parameters
 import util
 from tqdm import tqdm
-import csaps
+#import csaps
 
 p = Parameters()
 
@@ -50,6 +51,9 @@ def Testing():
     if torch.cuda.is_available():
         lane_agent.cuda()
 
+    cudnn.benchmark = True
+    cudnn.fastest = True
+
     ##############################
     ## testing
     ##############################
@@ -63,11 +67,12 @@ def Testing():
             cv2.waitKey(0) 
 
     elif p.mode == 1: # check model with video
-        cap = cv2.VideoCapture("/home/kym/research/autonomous_car_vision/lane_detection/code/Tusimple/git_version/LocalDataset_Day.mp4")
+        cap = cv2.VideoCapture("/home/tim/Codes-for-Lane-Detection/ERFNet-CULane-PyTorch/data/day2.MOV")
         while(cap.isOpened()):
             ret, frame = cap.read()
             torch.cuda.synchronize()
             prevTime = time.time()
+#            frame = frame[:-489, :, :]
             frame = cv2.resize(frame, (512,256))/255.0
             frame = np.rollaxis(frame, axis=2, start=0)
             _, _, ti = test(lane_agent, np.array([frame])) 
@@ -269,6 +274,7 @@ def test(lane_agent, test_images, thresh = p.threshold_point, index= -1):
     result = lane_agent.predict_lanes_test(test_images)
     torch.cuda.synchronize()
     confidences, offsets, instances = result[index]
+    print(confidences.size(), offsets.size(), instances.size())
     
     num_batch = len(test_images)
 

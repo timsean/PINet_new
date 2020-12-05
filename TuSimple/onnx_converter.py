@@ -10,11 +10,11 @@ from hourglass_network import lane_detection_network
 # (True)Convert to onnx mode.
 # (False)Check converted onnx model mode.
 convert = True 
-save_dir = '/media/data4/yg/PINet_new-master/CurveLanes/onnx_models/'
+save_dir = './onnx_models/'
 if convert == True:
 
     model = lane_detection_network()
-    weights_path = '/media/data4/yg/PINet_new-master/CurveLanes/savefile/32_tensor(1.1001)_lane_detection_network.pkl'
+    weights_path = './savefile/804_tensor(0.5786)_lane_detection_network.pkl'
 
     # Load the weights from a file (.pth or .pkl usually)
     state_dict = torch.load(weights_path)
